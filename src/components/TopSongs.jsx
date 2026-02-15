@@ -1,9 +1,48 @@
 import React, { useEffect, useState } from 'react'
 import axios from 'axios'
 
-// Usaremos la playlist "Top 50 - Spain" de Spotify (requiere token).
-// Añade en .env: VITE_SPOTIFY_CLIENT_ID y VITE_SPOTIFY_CLIENT_SECRET
-const PLAYLIST_ID = '37i9dQZEVXbNFJfN1Vw8d' // Top 50 - Spain
+// Strategy:
+// 1) Try to fetch Spotify Charts CSV (public) from Spotify Charts site and parse it client-side.
+// 2) If that fails and client credentials exist, fallback to Spotify Web API client-credentials flow.
+
+const CSV_URLS = [
+  'https://charts.spotify.com/regional/es/daily/latest/download',
+  'https://spotifycharts.com/regional/es/daily/latest/download',
+  'https://charts.spotify.com/regional/es/daily/latest/download?format=csv'
+]
+
+function parseCsv(text) {
+  // Basic CSV parser that respects quoted fields.
+  const lines = text.split(/\r?\n/).filter(Boolean)
+  // Find header index (line that starts with "Position")
+  let start = 0
+  for (let i = 0; i < lines.length; i++) {
+    if (/^Position/i.test(lines[i].trim())) { start = i + 1; break }
+  }
+
+  const rows = []
+  for (let i = start; i < lines.length; i++) {
+    const line = lines[i]
+    // split CSV respecting quotes
+    const fields = []
+    let cur = ''
+    let inQuotes = false
+    for (let ch of line) {
+      if (ch === '"') { inQuotes = !inQuotes; continue }
+      if (ch === ',' && !inQuotes) { fields.push(cur); cur = ''; continue }
+      cur += ch
+    }
+    fields.push(cur)
+
+    if (fields.length >= 3) {
+      const position = fields[0].trim()
+      const track = fields[1].trim()
+      const artist = fields[2].trim()
+      rows.push({ position, track, artist })
+    }
+  }
+  return rows
+}
 
 export default function TopSongs() {
   const [tracks, setTracks] = useState([])
@@ -14,75 +53,72 @@ export default function TopSongs() {
   const clientSecret = import.meta.env.VITE_SPOTIFY_CLIENT_SECRET
 
   useEffect(() => {
-    if (!clientId || !clientSecret) {
-      setError('Configura VITE_SPOTIFY_CLIENT_ID y VITE_SPOTIFY_CLIENT_SECRET en .env')
-      return
-    }
+    let cancelled = false
 
-    const fetchSpotify = async () => {
-      try {
-        setLoading(true)
-        setError(null)
-        const tokenRes = await axios.post(
-          'https://accounts.spotify.com/api/token',
-          new URLSearchParams({ grant_type: 'client_credentials' }),
-          {
-            headers: {
-              'Content-Type': 'application/x-www-form-urlencoded',
-              Authorization: 'Basic ' + btoa(`${clientId}:${clientSecret}`)
-            }
+    const fetchFromCsv = async () => {
+      for (const url of CSV_URLS) {
+        try {
+          setLoading(true)
+          const res = await fetch(url)
+          if (!res.ok) throw new Error('no-csv')
+          const text = await res.text()
+          const rows = parseCsv(text).slice(0, 10)
+          if (rows.length > 0) {
+            if (!cancelled) setTracks(rows)
+            return
           }
-        )
-
-        const token = tokenRes.data.access_token
-        const url = `https://api.spotify.com/v1/playlists/${PLAYLIST_ID}/tracks?limit=12`
-        const res = await axios.get(url, { headers: { Authorization: `Bearer ${token}` }, timeout: 10000 })
-
-        const items = (res.data.items || []).map((it) => {
-          const t = it.track || {}
-          return {
-            id: t.id,
-            name: t.name,
-            artists: (t.artists || []).map(a => a.name).join(', '),
-            album: t.album?.name || '',
-            img: t.album?.images?.[1]?.url || t.album?.images?.[0]?.url || '',
-            popularity: t.popularity || 0
-          }
-        })
-
-        setTracks(items)
-      } catch (err) {
-        console.error('Spotify error:', err)
-        setError('No se pudieron cargar las canciones desde Spotify')
-      } finally {
-        setLoading(false)
+        } catch (err) {
+          // try next URL
+          console.warn('CSV fetch failed for', url, err)
+          continue
+        }
       }
+
+      // if CSV failed, try Spotify API if credentials available
+      if (clientId && clientSecret) {
+        try {
+          const tokenRes = await axios.post(
+            'https://accounts.spotify.com/api/token',
+            new URLSearchParams({ grant_type: 'client_credentials' }),
+            { headers: { 'Content-Type': 'application/x-www-form-urlencoded', Authorization: 'Basic ' + btoa(`${clientId}:${clientSecret}`) } }
+          )
+          const token = tokenRes.data.access_token
+          // use Spotify Charts playlist id used earlier (Top 50 Spain) but limit to 10
+          const PLAYLIST_ID = '37i9dQZEVXbNFJfN1Vw8d'
+          const url = `https://api.spotify.com/v1/playlists/${PLAYLIST_ID}/tracks?limit=10`
+          const res2 = await axios.get(url, { headers: { Authorization: `Bearer ${token}` }, timeout: 10000 })
+          const items = (res2.data.items || []).map((it) => {
+            const t = it.track || {}
+            return { position: '', track: t.name, artist: (t.artists || []).map(a => a.name).join(', ') }
+          })
+          if (!cancelled) setTracks(items)
+          return
+        } catch (err) {
+          console.error('Spotify API fallback failed', err)
+        }
+      }
+
+      if (!cancelled) setError('No se pudieron obtener las canciones públicamente. Posible bloqueo CORS o la fuente ha cambiado.')
     }
 
-    fetchSpotify()
+    fetchFromCsv().finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
   }, [clientId, clientSecret])
 
   if (error) return <div className="error" style={{ padding: '12px' }}>⚠️ {error}</div>
   if (loading) return <div style={{ textAlign: 'center', padding: '20px' }}>Cargando canciones...</div>
-
   if (tracks.length === 0) return <div>No hay canciones disponibles</div>
 
   return (
     <div className="top-songs">
-      {tracks.map((t, i) => (
-        <a key={t.id || i} href={`https://open.spotify.com/track/${t.id}`} target="_blank" rel="noreferrer" style={{ textDecoration: 'none', color: 'inherit' }}>
-          <div className="video">
-            <div style={{ position: 'relative', overflow: 'hidden' }}>
-              {t.img && <img src={t.img} alt={t.name} style={{ width: '100%', display: 'block' }} />}
-              <div style={{ position: 'absolute', top: '8px', right: '8px', backgroundColor: 'rgba(0,0,0,0.8)', color: 'white', padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold' }}>#{i + 1}</div>
-            </div>
-            <div style={{ padding: '12px' }}>
-              <div className="title" style={{ marginBottom: '6px', fontWeight: 700 }}>{t.name}</div>
-              <div className="channel" style={{ marginBottom: '6px', color: '#666' }}>{t.artists}</div>
-              <div style={{ fontSize: '0.85rem', color: '#999' }}>{t.album} • Popularidad: {t.popularity}</div>
-            </div>
+      {tracks.slice(0, 10).map((t, i) => (
+        <div key={t.track + i} className="video" style={{ cursor: 'pointer' }}>
+          <div style={{ padding: '12px' }}>
+            <div className="title" style={{ marginBottom: '6px', fontWeight: 700 }}>{t.track}</div>
+            <div className="channel" style={{ marginBottom: '6px', color: '#666' }}>{t.artist}</div>
+            <div style={{ fontSize: '0.85rem', color: '#999' }}>#{i + 1}</div>
           </div>
-        </a>
+        </div>
       ))}
     </div>
   )

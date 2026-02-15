@@ -34,12 +34,18 @@ export default function WalletPanel() {
         setError('MetaMask no está instalado')
         return
       }
-      
+      // Más compatible: pedir cuentas directamente y crear provider
+      try {
+        await window.ethereum.request({ method: 'eth_requestAccounts' })
+      } catch (reqErr) {
+        setError('Permiso requerido para conectar la wallet')
+        return
+      }
+
       const prov = new ethers.BrowserProvider(window.ethereum)
-      await prov.send('eth_requestAccounts', [])
       const signer = await prov.getSigner()
       const addr = await signer.getAddress()
-      
+
       setProvider(prov)
       setAddress(addr)
       await fetchBalances(addr)

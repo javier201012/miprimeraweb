@@ -1,30 +1,21 @@
-import React, { useState } from 'react'
+import React from 'react'
 import CryptoList from './components/CryptoList'
 import TopSongs from './components/TopSongs'
 import WalletPanel from './components/WalletPanel'
 import './styles.css'
 
 export default function App() {
-  const [photo, setPhoto] = useState(null)
-
-  const handlePhotoUpload = (e) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      setPhoto(URL.createObjectURL(file))
-    }
-  }
-
   return (
     <div className="container">
       <header>
         <h1>💝 Agradecimiento Especial</h1>
-        
-        <img 
-          src="/papaymama.jpeg" 
-          alt="Papá y Mamá" 
+
+        <img
+          src="/papaymama.jpeg"
+          alt="Papá y Mamá"
           className="family-photo"
         />
-        
+
         <p className="formal">
           A mis padres, Francisco Javier Galán Vera y Gema Niño Agustino,
           <br />
@@ -32,48 +23,27 @@ export default function App() {
           <br />
           Este sitio está creado con cariño para ustedes.
         </p>
-        
-        <div className="photo-upload">
-          <label>📸 Subir foto familiar personalizada</label>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handlePhotoUpload}
-          />
-          {photo && (
-            <img 
-              src={photo} 
-              alt="Foto familiar" 
-              className="preview" 
-            />
-          )}
-        </div>
       </header>
 
       <main>
         <section>
           <h2>💰 Criptomonedas</h2>
           <p>
-            Top 10 criptomonedas por capitalización de mercado. 
-            Datos en tiempo real con precios actualizados.
+            Top 10 criptomonedas por capitalización de mercado. Datos en tiempo real.
           </p>
           <CryptoList />
         </section>
 
         <section>
-          <h2>🎵 Canciones Populares</h2>
-          <p>
-            Descubre las canciones más reproducidas en YouTube.
-            Configura tu API key en <code>.env</code> para activar esta sección.
-          </p>
+          <h2>🎵 Canciones Populares (España)</h2>
+          <p>Las canciones más escuchadas en Spotify España. Configura las credenciales en <code>.env</code>.</p>
           <TopSongs />
         </section>
 
         <section>
           <h2>🔗 Panel Web3</h2>
           <p>
-            Conecta tu wallet MetaMask para acceder a tu información
-            en Binance Smart Chain. Visualiza balances y gestiona tokens.
+            Conecta tu wallet MetaMask para acceder a tus balances y tokens en Binance Smart Chain.
           </p>
           <WalletPanel />
         </section>

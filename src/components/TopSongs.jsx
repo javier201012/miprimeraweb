@@ -56,9 +56,24 @@ export default function TopSongs() {
     let cancelled = false
 
     const fetchFromCsv = async () => {
+      setLoading(true)
+      try {
+        // Prefer local proxy to avoid CORS
+        const proxyRes = await fetch('/api/charts/spain')
+        if (proxyRes.ok) {
+          const data = await proxyRes.json()
+          if (data && data.items && data.items.length > 0) {
+            if (!cancelled) setTracks(data.items.slice(0, 10))
+            return
+          }
+        }
+      } catch (e) {
+        console.warn('Proxy fetch failed', e)
+      }
+
+      // Last-resort: try client-side CSV fallback (may hit CORS)
       for (const url of CSV_URLS) {
         try {
-          setLoading(true)
           const res = await fetch(url)
           if (!res.ok) throw new Error('no-csv')
           const text = await res.text()
@@ -68,37 +83,12 @@ export default function TopSongs() {
             return
           }
         } catch (err) {
-          // try next URL
           console.warn('CSV fetch failed for', url, err)
           continue
         }
       }
 
-      // if CSV failed, try Spotify API if credentials available
-      if (clientId && clientSecret) {
-        try {
-          const tokenRes = await axios.post(
-            'https://accounts.spotify.com/api/token',
-            new URLSearchParams({ grant_type: 'client_credentials' }),
-            { headers: { 'Content-Type': 'application/x-www-form-urlencoded', Authorization: 'Basic ' + btoa(`${clientId}:${clientSecret}`) } }
-          )
-          const token = tokenRes.data.access_token
-          // use Spotify Charts playlist id used earlier (Top 50 Spain) but limit to 10
-          const PLAYLIST_ID = '37i9dQZEVXbNFJfN1Vw8d'
-          const url = `https://api.spotify.com/v1/playlists/${PLAYLIST_ID}/tracks?limit=10`
-          const res2 = await axios.get(url, { headers: { Authorization: `Bearer ${token}` }, timeout: 10000 })
-          const items = (res2.data.items || []).map((it) => {
-            const t = it.track || {}
-            return { position: '', track: t.name, artist: (t.artists || []).map(a => a.name).join(', ') }
-          })
-          if (!cancelled) setTracks(items)
-          return
-        } catch (err) {
-          console.error('Spotify API fallback failed', err)
-        }
-      }
-
-      if (!cancelled) setError('No se pudieron obtener las canciones públicamente. Posible bloqueo CORS o la fuente ha cambiado.')
+      if (!cancelled) setError('No se pudieron obtener las canciones públicamente. Ejecuta el proxy (`npm run server`) para evitar CORS.')
     }
 
     fetchFromCsv().finally(() => { if (!cancelled) setLoading(false) })

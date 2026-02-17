@@ -48,6 +48,7 @@ export default function TopSongs() {
   const [tracks, setTracks] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [source, setSource] = useState(null)
 
   const clientId = import.meta.env.VITE_SPOTIFY_CLIENT_ID
   const clientSecret = import.meta.env.VITE_SPOTIFY_CLIENT_SECRET
@@ -63,7 +64,10 @@ export default function TopSongs() {
         if (proxyRes.ok) {
           const data = await proxyRes.json()
           if (data && data.items && data.items.length > 0) {
-            if (!cancelled) setTracks(data.items.slice(0, 10))
+            if (!cancelled) {
+              setTracks(data.items.slice(0, 10))
+              setSource(data.source || 'proxy')
+            }
             return
           }
         }
@@ -101,12 +105,13 @@ export default function TopSongs() {
 
   return (
     <div className="top-songs">
+      <div style={{ fontSize: '0.85rem', color: '#bbb', marginBottom: '8px' }}>Fuente: {source || 'desconocida'}</div>
       {tracks.slice(0, 10).map((t, i) => (
-        <div key={t.track + i} className="video" style={{ cursor: 'pointer' }}>
+        <div key={(t.track || '') + i} className="video" style={{ cursor: 'pointer' }}>
           <div style={{ padding: '12px' }}>
             <div className="title" style={{ marginBottom: '6px', fontWeight: 700 }}>{t.track}</div>
             <div className="channel" style={{ marginBottom: '6px', color: '#666' }}>{t.artist}</div>
-            <div style={{ fontSize: '0.85rem', color: '#999' }}>#{i + 1}</div>
+            <div style={{ fontSize: '0.85rem', color: '#999' }}>#{t.position || (i + 1)}</div>
           </div>
         </div>
       ))}

@@ -59,8 +59,8 @@ export default function TopSongs() {
     const fetchFromCsv = async () => {
       setLoading(true)
       try {
-        // Prefer local proxy to avoid CORS
-        const proxyRes = await fetch('/api/charts/spain')
+        // Prefer local proxy to avoid CORS (must point to port 5175)
+        const proxyRes = await fetch('http://localhost:5175/api/charts/spain')
         if (proxyRes.ok) {
           const data = await proxyRes.json()
           if (data && data.items && data.items.length > 0) {

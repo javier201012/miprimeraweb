@@ -35,8 +35,8 @@ export default function App() {
         </section>
 
         <section>
-          <h2>🎵 Canciones Populares (España)</h2>
-          <p>Las canciones más escuchadas en Spotify España. Configura las credenciales en <code>.env</code>.</p>
+          <h2>🎵 Canciones de Dani Martín</h2>
+          <p>Las 10 canciones más populares de Dani Martín ordenadas por reproducciones.</p>
           <TopSongs />
         </section>
 

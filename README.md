@@ -32,3 +32,23 @@ Notas:
 - La sección de canciones usa un proxy para evitar CORS. En local arranca `npm run server`.
 - En despliegues (ej. Netlify), publica también el backend y configura `VITE_PROXY_BASE_URL=https://tu-backend`.
 - Proporciona la foto familiar cuando quieras y la integro en el encabezado.
+
+## Despliegue del proxy (Render) + Netlify
+
+1. Sube este repo a GitHub (ya incluye `render.yaml`).
+2. En Render: **New +** → **Blueprint** → selecciona el repo.
+3. Render creará el servicio `miprimeraweb-proxy` y arrancará con `npm run server`.
+4. Espera a que quede en estado **Live** y copia la URL, por ejemplo:
+
+```text
+https://miprimeraweb-proxy.onrender.com
+```
+
+5. En Netlify (sitio frontend):
+	- Ve a **Site settings** → **Environment variables**.
+	- Crea `VITE_PROXY_BASE_URL` con la URL de Render.
+	- Vuelve a desplegar el sitio.
+
+6. Comprobación rápida:
+	- Salud del backend: `https://TU-BACKEND/api/health`
+	- Endpoint de canciones: `https://TU-BACKEND/api/charts/spain`

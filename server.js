@@ -10,6 +10,10 @@ console.log('[SERVER] VITE_SPOTIFY_CLIENT_SECRET:', process.env.VITE_SPOTIFY_CLI
 const app = express()
 const PORT = process.env.PORT || 5175
 
+app.get('/api/health', (req, res) => {
+  res.json({ ok: true, service: 'spotify-proxy' })
+})
+
 // CORS middleware
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*')

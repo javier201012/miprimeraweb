@@ -52,27 +52,36 @@ export default function TopSongs() {
 
   const clientId = import.meta.env.VITE_SPOTIFY_CLIENT_ID
   const clientSecret = import.meta.env.VITE_SPOTIFY_CLIENT_SECRET
+  const proxyBaseUrl = import.meta.env.VITE_PROXY_BASE_URL
 
   useEffect(() => {
     let cancelled = false
 
     const fetchFromCsv = async () => {
       setLoading(true)
-      try {
-        // Prefer local proxy to avoid CORS (must point to port 5175)
-        const proxyRes = await fetch('http://localhost:5175/api/charts/spain')
-        if (proxyRes.ok) {
-          const data = await proxyRes.json()
-          if (data && data.items && data.items.length > 0) {
-            if (!cancelled) {
-              setTracks(data.items.slice(0, 10))
-              setSource(data.source || 'proxy')
+      const normalizedBase = proxyBaseUrl ? proxyBaseUrl.replace(/\/$/, '') : ''
+      const proxyCandidates = [
+        normalizedBase ? `${normalizedBase}/api/charts/spain` : null,
+        '/api/charts/spain',
+        'http://localhost:5175/api/charts/spain'
+      ].filter(Boolean)
+
+      for (const endpoint of proxyCandidates) {
+        try {
+          const proxyRes = await fetch(endpoint)
+          if (proxyRes.ok) {
+            const data = await proxyRes.json()
+            if (data && data.items && data.items.length > 0) {
+              if (!cancelled) {
+                setTracks(data.items.slice(0, 10))
+                setSource(data.source || 'proxy')
+              }
+              return
             }
-            return
           }
+        } catch (e) {
+          console.warn('Proxy fetch failed for', endpoint, e)
         }
-      } catch (e) {
-        console.warn('Proxy fetch failed', e)
       }
 
       // Last-resort: try client-side CSV fallback (may hit CORS)
@@ -92,12 +101,14 @@ export default function TopSongs() {
         }
       }
 
-      if (!cancelled) setError('No se pudieron obtener las canciones públicamente. Ejecuta el proxy (`npm run server`) para evitar CORS.')
+      if (!cancelled) {
+        setError('No se pudieron obtener las canciones públicamente. En local ejecuta `npm run server`. En Netlify configura `VITE_PROXY_BASE_URL` con la URL de tu backend.')
+      }
     }
 
     fetchFromCsv().finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [clientId, clientSecret])
+  }, [clientId, clientSecret, proxyBaseUrl])
 
   if (error) return <div className="error" style={{ padding: '12px' }}>⚠️ {error}</div>
   if (loading) return <div style={{ textAlign: 'center', padding: '20px' }}>Cargando canciones...</div>
